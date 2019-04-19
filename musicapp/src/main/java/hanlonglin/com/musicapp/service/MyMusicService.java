@@ -8,16 +8,12 @@ import android.content.Context;
 import android.content.Intent;
 import android.media.MediaPlayer;
 import android.os.Binder;
-import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
-import android.os.Message;
 import android.support.annotation.Nullable;
 import android.util.Log;
-import android.view.DragEvent;
 import android.view.View;
-import android.widget.ProgressBar;
 import android.widget.RemoteViews;
 import android.widget.SeekBar;
 
@@ -28,7 +24,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 import hanlonglin.com.musicapp.R;
-import hanlonglin.com.musicapp.SongDetailActivity2;
+import hanlonglin.com.musicapp.SongDetailActivity;
 import hanlonglin.com.musicapp.model.Song;
 
 import static hanlonglin.com.musicapp.service.MyMusicService.MyMusicControl.STATE_PLAYING;
@@ -51,7 +47,6 @@ public class MyMusicService extends Service {
         musicControl = new MyMusicControl();
         notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
     }
-
 
     @Nullable
     @Override
@@ -325,7 +320,7 @@ public class MyMusicService extends Service {
         Notification.Builder builder = new Notification.Builder(MyMusicService.this);
         builder.setSmallIcon(R.drawable.start);
         builder.setContent(remoteViews);
-        Intent intent = new Intent(MyMusicService.this, SongDetailActivity2.class);
+        Intent intent = new Intent(MyMusicService.this, SongDetailActivity.class);
         intent.putExtra("index", musicControl.getCurrentIndex());
         intent.putExtra("from","notification");
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);

@@ -1,1 +1,1 @@
-include ':app', ':musicapp'
+include ':app', ':musicapp', ':videoapp'

@@ -4,101 +4,92 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
-import android.os.Handler;
-import android.os.IBinder;
-import android.os.Message;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.os.IBinder;
+import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
-import android.view.View;
 import android.widget.ImageView;
-import android.widget.ProgressBar;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import hanlonglin.com.musicapp.model.Song;
-import hanlonglin.com.musicapp.service.MusicService;
+import hanlonglin.com.musicapp.service.MyMusicService;
 
-public class SongDetailActivity extends AppCompatActivity implements View.OnClickListener {
+public class SongDetailActivity extends AppCompatActivity {
     private final static String TAG = "SongDetailActivity";
     TextView txt_title;
-    ProgressBar progressBar;
+    SeekBar seekBar;
     TextView txt_time;
+    TextView txt_current;
     ImageView img_previous;
     ImageView img_start;
     ImageView img_next;
 
-    MusicService.MusicControl musicControl;
+    MyMusicService.MyMusicControl musicControl;
     private int currentIndex = -1;
+    MyMusicListener myMusicListener = new MyMusicListener();
+    private String from;
 
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Log.e("SongDetailActivity", "onCreate()");
         setContentView(R.layout.activity_song_detail);
         initView();
         getIntentData();
 
-        Intent intent = new Intent(SongDetailActivity.this, MusicService.class);
+        Intent intent = new Intent(SongDetailActivity.this, MyMusicService.class);
         startService(intent);
         bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        Log.e("SongDetailActivity", "onResume()");
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+
+        getIntentData();
+        Log.e("SongDetailActivity", "onNewIntent(), index:"+currentIndex);
+        //重新绑定
+        bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        Log.e("SongDetailActivity", "onDestory()");
+        unbindService(serviceConnection);
     }
 
     private void getIntentData() {
         Intent intent = getIntent();
         currentIndex = intent.getIntExtra("index", -1);
+        from = intent.getStringExtra("from");
+        if (from == null)
+            from = "";
+
+        Log.e("getIntentData()","currentIndex:"+currentIndex);
     }
 
-    //每次切换歌曲或点击按钮更新显示
-    private void updateSongView() {
-        if(musicControl!=null) {
-            Song song = musicControl.getCurrentSongList().get(musicControl.getCurrentIndex());
-            txt_title.setText(song.getName());
-            if (musicControl.getState() == MusicService.MusicControl.STATE_PAUSE) {
-                img_start.setImageResource(R.drawable.start);
-            } else {
-                img_start.setImageResource(R.drawable.pause);
-            }
-        }
-    }
 
     private void initView() {
         txt_title = (TextView) findViewById(R.id.txt_title);
-        progressBar = (ProgressBar) findViewById(R.id.seekBar);
+        seekBar = (SeekBar) findViewById(R.id.seekBar);
         txt_time = (TextView) findViewById(R.id.txt_time);
+        txt_current = (TextView) findViewById(R.id.txt_current);
         img_previous = (ImageView) findViewById(R.id.img_previous);
         img_next = (ImageView) findViewById(R.id.img_next);
         img_start = (ImageView) findViewById(R.id.img_start);
 
-        progressBar.setMax(100);
+        //seekBar.setMax(100);
 
-        img_start.setOnClickListener(this);
-        img_previous.setOnClickListener(this);
-        img_next.setOnClickListener(this);
-    }
-
-    @Override
-    public void onClick(View v) {
-        switch (v.getId()) {
-            case R.id.img_next:
-                if (musicControl != null) {
-                    musicControl.next();
-                    updateSongView();
-                }
-                break;
-            case R.id.img_previous:
-                if (musicControl != null) {
-                    musicControl.previous();
-                    updateSongView();
-                }
-                break;
-            case R.id.img_start:
-                if (musicControl != null) {
-                    musicControl.play();
-                    updateSongView();
-                }
-                break;
-        }
     }
 
 
@@ -106,7 +97,7 @@ public class SongDetailActivity extends AppCompatActivity implements View.OnClic
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
             Log.e(TAG, "onServiceConnected 已连接");
-            musicControl = (MusicService.MusicControl) service;
+            musicControl = (MyMusicService.MyMusicControl) service;
             if (musicControl != null) {
                 musicControl.setCurrentSongList(MusicApplication.getInstance().getCurrentSonglist());
                 //播放
@@ -114,10 +105,11 @@ public class SongDetailActivity extends AppCompatActivity implements View.OnClic
                     Toast.makeText(SongDetailActivity.this, "播放失败！index=-1", Toast.LENGTH_SHORT).show();
                     return;
                 }
+                musicControl.addOnMusicListener(myMusicListener);
                 musicControl.setCurrentIndex(currentIndex);
-                musicControl.play();
-                txt_time.setText(musicControl.getCurrentDuration()+"");
-                musicControl.setProgressHandler(ProgressHandler);
+//                if (!from.equals("notification"))
+                    musicControl.play();
+                musicControl.bindView(img_previous, img_start, img_next, seekBar);
             }
         }
 
@@ -127,15 +119,71 @@ public class SongDetailActivity extends AppCompatActivity implements View.OnClic
         }
     };
 
-    Handler ProgressHandler = new Handler() {
+
+    private class MyMusicListener implements MyMusicService.OnMusicListener {
+
         @Override
-        public void handleMessage(Message msg) {
-            super.handleMessage(msg);
-            Log.e("TAG","接收到msg:"+msg.arg1);
-            int progress=msg.arg1;
-            progressBar.setProgress(progress);
+        public void onUpdateProgress(int progress) {
+            seekBar.setProgress(progress);
+            Log.e("TAG", "onUpdateProgress:" + progress);
+            txt_current.setText(secondsToTime(progress / 1000));
         }
-    };
+
+        @Override
+        public void onStart(Song song) {
+            Log.e("MyMusicListener","onStart()");
+            txt_title.setText(song.getName());
+            txt_time.setText(secondsToTime(musicControl.getCurrentDuration() / 1000));
+            img_start.setImageResource(R.drawable.pause);
+            seekBar.setMax(musicControl.getCurrentDuration());
+        }
+
+        private String secondsToTime(int allSeconds) {
+            int hours = allSeconds / 60 / 60;
+            int minutes = allSeconds / 60;
+            int seconds = allSeconds % 60;
+            String hourStr = "";
+            String minuteStr = "";
+            String secondStr = "";
+            if (hours != 0) {
+                if (hours >= 10 && hours < 60)
+                    hourStr = hours + ":";
+                else if (hours < 10)
+                    hourStr = "0" + hours + ":";
+            }
+            // if (minutes != 0) {
+            if (minutes >= 10 && minutes < 60)
+                minuteStr = minutes + ":";
+            else if (minutes < 10)
+                minuteStr = "0" + minutes + ":";
+            //  }
+            //  if (seconds != 0) {
+            if (seconds >= 10 && seconds < 60)
+                secondStr = seconds + "";
+            else if (minutes < 10)
+                secondStr = "0" + seconds;
+            //  }
+            return hourStr + minuteStr + secondStr;
+        }
+
+        @Override
+        public void onPause(Song song) {
+            txt_title.setText(song.getName());
+            txt_time.setText(secondsToTime(musicControl.getCurrentDuration() / 1000));
+            seekBar.setMax(musicControl.getCurrentDuration());
+            img_start.setImageResource(R.drawable.start);
+        }
+
+        @Override
+        public void onNext(Song old, Song now) {
+            txt_title.setText(now.getName());
+        }
+
+        @Override
+        public void onPrevious(Song old, Song now) {
+            txt_title.setText(now.getName());
+        }
+    }
 
     public static void actionStart(Context context, int index) {
         Intent intent = new Intent(context, SongDetailActivity.class);

@@ -12,7 +12,6 @@ import java.util.List;
 
 import hanlonglin.com.musicapp.R;
 import hanlonglin.com.musicapp.SongDetailActivity;
-import hanlonglin.com.musicapp.SongDetailActivity2;
 import hanlonglin.com.musicapp.model.Song;
 
 public class SongAdapter extends RecyclerView.Adapter {
@@ -59,7 +58,7 @@ public class SongAdapter extends RecyclerView.Adapter {
             itemView.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    SongDetailActivity2.actionStart(context,pos);
+                    SongDetailActivity.actionStart(context,pos);
                 }
             });
         }
